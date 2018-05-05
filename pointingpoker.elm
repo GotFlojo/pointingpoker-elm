@@ -1,87 +1,99 @@
 module Main exposing (..)
 
-import Html exposing (..)
-import Html.Events exposing (..)
-import Html.Attributes exposing (..)
-import String exposing (..)
-import Random exposing (..)
+-- import Maybe.Extra exposing (..)
 
-main =
-    Html.beginnerProgram 
-        { model = init
-        , update = update
-        , view = view
-        }
 
--- model
-type alias Vote = 
-    { points: Int
-    , visible: Bool
-    }
-newVote : Vote 
-newVote = 
-    { points = 0
-    , visible = True
-    }
 type alias User =
-    { name: String
-    , vote: Vote
-    , hasVoted: Bool
-    , id: Int
+    { name : String
+    , vote : Maybe Int
     }
-newUser : String -> User
-newUser name =
+
+
+mkUser : String -> User
+mkUser name =
     { name = name
-    , vote = newVote
-    , hasVoted = False
-    , id = 0
+    , vote = Nothing
     }
 
-type alias Model = 
-    { id: String
-    , lastUser: String
-    , users: List User
-    , story: String
-    , votingDone: Bool
-    }
-    
-init : Model
-init = 
-    { id = "0"
-    , lastUser = ""
-    , users = []
-    , story = ""
-    , votingDone = False
-    }
 
--- update
-type Msg 
-    = AddUser
-    | DeleteUser String
-    | EditCurrentUser String
-    | NewStory String
-    | ClearVote
-    | NewSession
-    | NewUserId Int
-
-update : Msg -> Model -> Model
-update msg model =
-    case msg of
-        AddUser -> {model | users = (newUser model.lastUser) :: model.users}
-        EditCurrentUser name -> {model | lastUser = name}
-        NewStory newStory -> {model | story = newStory}
-        NewSession -> init
-        _ -> model 
+type alias Session =
+    List User
 
 
--- view
-view : Model -> Html Msg
-view model =
-    div [] 
-        [ div [] [ text (toString model)]
-        , div [] [ input [ type_ "text", placeholder "New Story", onInput NewStory] []]
-        , div [] [ input [ type_ "text", placeholder "New User", onInput EditCurrentUser] []
-                 , button [onClick AddUser] [text "+"]
-                 ]
-        , div [] [ button [onClick NewSession] [text "Clear"]]
-        ]
+addUser : Session -> User -> Maybe Session
+addUser session user =
+    case List.member user session of
+        False ->
+            Just (user :: session)
+
+        _ ->
+            Nothing
+
+
+hasVoted : User -> Bool
+hasVoted user =
+    case user.vote of
+        Nothing ->
+            False
+
+        Just _ ->
+            True
+
+
+doVote : User -> Int -> User
+doVote user newVote =
+    { user | vote = (Just newVote) }
+
+
+clearVote : User -> User
+clearVote user =
+    { user | vote = Nothing }
+
+
+getVotes : Session -> List (Maybe Int)
+getVotes session =
+    List.map (\user -> user.vote) session
+
+
+getUsernames : Session -> List String
+getUsernames session =
+    List.map (\user -> user.name) session
+
+
+votingDone : Session -> Bool
+votingDone session =
+    List.all hasVoted session
+
+
+getVoteValue : Maybe Int -> Int
+getVoteValue vote =
+    case vote of
+        Nothing ->
+            0
+
+        Just value ->
+            value
+
+
+getCountableVotes : List (Maybe Int) -> List Int
+getCountableVotes votes =
+    let
+        isCountable vote =
+            case vote of
+                Nothing ->
+                    False
+
+                _ ->
+                    True
+    in
+        votes
+            |> List.filter isCountable
+            |> List.map getVoteValue
+
+
+maxVote votes =
+    List.maximum votes
+
+
+minVote votes =
+    List.minimum votes
