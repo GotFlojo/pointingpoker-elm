@@ -34,7 +34,9 @@ type alias Model =
     { story : String
     , users : UserList
     , hasResult : UserList -> Bool
+    , result : Float
     , userNameInput : String
+    , userPointsInput : String
     , error : String
     }
 
@@ -52,10 +54,11 @@ type Msg
     | DeleteUser User
     | Vote User Int
     | UpdateNameInput String
+    | GetResult
 
 
-addUser : UserList -> User -> Maybe UserList
-addUser session user =
+addUser : User -> UserList -> Maybe UserList
+addUser user session =
     case List.member user session of
         False ->
             Just (user :: session)
@@ -64,9 +67,9 @@ addUser session user =
             Nothing
 
 
-addUserToSession : Model -> User -> Model
-addUserToSession session user =
-    case (addUser session.users user) of
+addUserToSession : User -> Model -> Model
+addUserToSession user session =
+    case (addUser user session.users) of
         Just userlist ->
             { session | users = userlist, userNameInput = "", error = "" }
 
@@ -74,23 +77,13 @@ addUserToSession session user =
             { session | error = "User with that name already exists", userNameInput = "" }
 
 
-deleteUser : UserList -> User -> UserList
-deleteUser session user =
+deleteUser : User -> UserList -> UserList
+deleteUser user session =
     List.filter (\{ name } -> name /= user.name) session
 
 
-hasVoted : User -> Bool
-hasVoted user =
-    case user.vote of
-        Nothing ->
-            False
-
-        Just _ ->
-            True
-
-
-doVote : User -> Int -> User
-doVote user newVote =
+doVote : Int -> User -> User
+doVote newVote user =
     { user | vote = (Just newVote) }
 
 
@@ -107,6 +100,16 @@ getVotes session =
 getUsernames : UserList -> List String
 getUsernames session =
     List.map (\user -> user.name) session
+
+
+hasVoted : User -> Bool
+hasVoted user =
+    case user.vote of
+        Nothing ->
+            False
+
+        Just _ ->
+            True
 
 
 votingDone : UserList -> Bool
@@ -163,10 +166,10 @@ update msg model =
             { model | story = "" }
 
         AddUser name ->
-            addUserToSession model (mkUser name)
+            addUserToSession (mkUser name) model
 
         DeleteUser name ->
-            { model | users = deleteUser model.users name }
+            { model | users = deleteUser name model.users }
 
         UpdateNameInput name ->
             { model | userNameInput = name }
@@ -183,7 +186,7 @@ renderUserList users =
                 [ text user.name
                 , button [ onClick (DeleteUser user) ] [ text "x" ]
                 , div []
-                    [ input [ placeholder "Points" ] []
+                    [ input [ type_ "number", Html.Attributes.min "0", placeholder "Points" ] []
                     , button [ onClick (Vote user 1) ] [ text "Vote User" ]
                     ]
                 ]
@@ -209,7 +212,7 @@ view model =
         , div
             []
             [ button [ onClick NewSession ] [ text "New Session" ]
-            , button [] [ text "Get Result" ]
+            , button [ disabled (model.hasResult model.users) ] [ text "Get Result" ]
             ]
         , div [] <|
             if String.isEmpty model.error then
@@ -227,7 +230,7 @@ view model =
 
 init : Model
 init =
-    Model "" [] votingDone "" ""
+    Model "" [] votingDone 0.0 "" "" ""
 
 
 main =
