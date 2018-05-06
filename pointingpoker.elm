@@ -77,6 +77,11 @@ addUserToSession user session =
             { session | error = "User with that name already exists", userNameInput = "" }
 
 
+asUserInSession : Model -> User -> Model
+asUserInSession =
+    flip addUserToSession
+
+
 deleteUser : User -> UserList -> UserList
 deleteUser user session =
     List.filter (\{ name } -> name /= user.name) session
@@ -178,6 +183,10 @@ update msg model =
             model
 
 
+
+-- View
+
+
 renderUserList : UserList -> Html Msg
 renderUserList users =
     let
@@ -186,16 +195,24 @@ renderUserList users =
                 [ text user.name
                 , button [ onClick (DeleteUser user) ] [ text "x" ]
                 , div []
-                    [ input [ type_ "number", Html.Attributes.min "0", placeholder "Points" ] []
-                    , button [ onClick (Vote user 1) ] [ text "Vote User" ]
+                    [ renderVotingOptions
+                    , button [ onClick (Vote user 1) ] [ text "Vote" ]
                     ]
                 ]
     in
         ul [] <| List.map listItem users
 
 
+renderVotingOptions : Html Msg
+renderVotingOptions =
+    let
+        mkOption listItem =
+            option [] [ listItem |> toString |> text ]
 
--- View
+        default =
+            option [ selected True, hidden True, disabled True ] [ text "Points" ]
+    in
+        select [] <| default :: (List.map mkOption [ 0, 1, 2, 3, 5, 8, 13, 20, 40, 100 ])
 
 
 view : Model -> Html Msg
@@ -222,16 +239,11 @@ view model =
         ]
 
 
-
---Html.beginnerProgram
---main =
---   view (Session "" [ mkUser "Flori" ] votingDone)
-
-
 init : Model
 init =
     Model "" [] votingDone 0.0 "" "" ""
 
 
+main : Program Never Model Msg
 main =
     beginnerProgram { model = init, view = view, update = update }
