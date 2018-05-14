@@ -3,6 +3,7 @@ module Main exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Dict exposing (..)
 
 
 -- import Maybe.Extra exposing (..)
@@ -12,6 +13,7 @@ import Html.Events exposing (..)
 type alias User =
     { name : String
     , vote : Maybe Int
+    , id : Int
     }
 
 
@@ -23,16 +25,17 @@ mkUser : String -> User
 mkUser name =
     { name = name
     , vote = Nothing
+    , id = 0
     }
 
 
 type alias UserList =
-    List User
+    Dict Int User
 
 
 type alias Model =
     { story : String
-    , users : UserList
+    , users : Dict Int User
     , hasResult : UserList -> Bool
     , result : Float
     , userNameInput : String
@@ -57,34 +60,24 @@ type Msg
     | GetResult
 
 
-addUser : User -> UserList -> Maybe UserList
-addUser user session =
-    case List.member user session of
-        False ->
-            Just (user :: session)
-
-        _ ->
-            Nothing
+addUser : Int -> User -> UserList -> UserList
+addUser id user users =
+    Dict.insert id { user | id = id } users
 
 
-addUserToSession : User -> Model -> Model
-addUserToSession user session =
-    case (addUser user session.users) of
-        Just userlist ->
-            { session | users = userlist, userNameInput = "", error = "" }
-
-        Nothing ->
-            { session | error = "User with that name already exists", userNameInput = "" }
+addUserToSession : ( Int, User ) -> Model -> Model
+addUserToSession ( id, user ) session =
+    { session | users = addUser id user session.users }
 
 
-asUserInSession : Model -> User -> Model
+asUserInSession : Model -> ( Int, User ) -> Model
 asUserInSession =
     flip addUserToSession
 
 
-deleteUser : User -> UserList -> UserList
-deleteUser user session =
-    List.filter (\{ name } -> name /= user.name) session
+deleteUser : Int -> UserList -> UserList
+deleteUser userId users =
+    Dict.remove userId users
 
 
 doVote : Int -> User -> User
@@ -99,12 +92,20 @@ clearVote user =
 
 getVotes : UserList -> List (Maybe Int)
 getVotes session =
-    List.map (\user -> user.vote) session
+    let
+        users =
+            Dict.values session
+    in
+        List.map (\user -> user.vote) users
 
 
 getUsernames : UserList -> List String
 getUsernames session =
-    List.map (\user -> user.name) session
+    let
+        users =
+            Dict.values session
+    in
+        List.map (\user -> user.name) users
 
 
 hasVoted : User -> Bool
@@ -119,7 +120,11 @@ hasVoted user =
 
 votingDone : UserList -> Bool
 votingDone session =
-    List.all hasVoted session
+    let
+        users =
+            Dict.values session
+    in
+        List.all hasVoted users
 
 
 getVoteValue : Maybe Int -> Int
@@ -171,10 +176,24 @@ update msg model =
             { model | story = "" }
 
         AddUser name ->
-            addUserToSession (mkUser name) model
+            let
+                unwrap =
+                    (\n ->
+                        case n of
+                            Nothing ->
+                                0
+
+                            Just i ->
+                                i + 1
+                    )
+
+                newId =
+                    model.users |> Dict.keys |> List.maximum |> unwrap
+            in
+                addUserToSession ( newId, (mkUser name) ) model
 
         DeleteUser name ->
-            { model | users = deleteUser name model.users }
+            { model | users = deleteUser name.id model.users }
 
         UpdateNameInput name ->
             { model | userNameInput = name }
@@ -200,7 +219,7 @@ renderUserList users =
                     ]
                 ]
     in
-        ul [] <| List.map listItem users
+        ul [] <| List.map listItem (Dict.values users)
 
 
 renderVotingOptions : Html Msg
@@ -241,7 +260,7 @@ view model =
 
 init : Model
 init =
-    Model "" [] votingDone 0.0 "" "" ""
+    Model "" Dict.empty votingDone 0.0 "" "" ""
 
 
 main : Program Never Model Msg
